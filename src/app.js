@@ -28,10 +28,11 @@ app.use(express.static('public'));
 // COOKIE PARSER to use crud operation on special cookies
 app.use(cookieParser());
 
-// routes import
-import userRouter from './routes/user.routes.js';
 
-// routes declaration
+// ROUTES
+
+import userRouter from './routes/user.routes.js';
 app.use('/api/v1/users',userRouter);
+
 
 export { app };
