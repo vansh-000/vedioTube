@@ -4,6 +4,33 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { User } from '../models/user.model.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
+// ACCESS AND REFRESH TOKEN GENERATER
+
+const generateAccessAndRefreshToken = async (id) => {
+    try {
+        const user = await User.findById(id);
+
+        if (!user) {
+            throw new ApiError('Something went wrong', 500);
+        }
+
+        const accessToken = user.generateAcessToken();
+        const refreshToken = user.generateRefreshToken();
+
+        // update the refresh token in user object
+        user.refreshToken = refreshToken;
+
+        // save the user in DB
+        // don't validate the user otherwise it will expect a password
+        await user.save({ validateBeforeSave: false });
+
+        // return access and refresh token
+        return { accessToken, refreshToken };
+    } catch (error) {
+        throw new ApiError('Error creating access and refresh token', 500);
+    }
+};
+
 const registerUser = asyncHandler(async (req, res) => {
     // Get user data from request body
     const { username, fullname, email, password } = req.body;
@@ -81,4 +108,92 @@ const registerUser = asyncHandler(async (req, res) => {
         );
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+    // get data from body
+    const { username, email, password } = req.body;
+
+    // check username and email
+    if (!username && !email) {
+        throw new ApiError('Username or Email is required', 400);
+    }
+
+    // find user
+    const user = await User.findOne({
+        $or: [
+            { username: username.toLowerCase() },
+            { email: email.toLowerCase() },
+        ],
+    });
+    if (!user) {
+        throw new ApiError('User not found', 404);
+    }
+
+    // authenticate password
+    const isValidPassword = await user.isValidPassword(password);
+    if (!isValidPassword) {
+        throw new ApiError('Invalid credentials', 401);
+    }
+
+    // generate acces and refresh tokens
+    const { accessToken, refreshToken } = generateAccessAndRefreshToken(
+        user._id
+    );
+
+    // update the user
+    const loggedInUser = await User.findByIdAndUpdate(
+        user._id.select('-password -refreshToken')
+    );
+
+    // generate cookies
+    const cookiesOptions = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    // send cookies
+    return res
+        .status(200)
+        .cookies('accessToken', accessToken, cookiesOptions)
+        .cookies('refreshToken', refreshToken, options)
+        .json(
+            new ApiResponse('User logged in Successfully', 200, {
+                user: loggedInUser,
+                accessToken,
+                refreshToken,
+            })
+        );
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+    // we don't have the access of the user so we will take a middleware that
+    // takes accessToken and finds the user and injects the user in req
+    
+    const user = await req.user;
+    await User.findByIdAndUpdate(
+        user._id,
+        {
+            $set: {
+                refreshToken: undefined,
+            },
+        },
+        // get the updated user
+        {
+            new: true,
+        }
+    );
+
+    const cookiesOptions = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    // clear the cookies
+
+    return res
+        .status(200)
+        .clearCookie('accessToken', cookiesOptions)
+        .clearCookie('refreshToken', cookiesOptions)
+        .json(new ApiResponse('User logged out Successfully', 200));
+});
+
+export { registerUser, loginUser, logoutUser };
