@@ -17,6 +17,7 @@ const generateAccessAndRefreshToken = async (id) => {
         const accessToken = user.generateAcessToken();
         const refreshToken = user.generateRefreshToken();
 
+        // console.log(accessToken,refreshToken)
         // update the refresh token in user object
         user.refreshToken = refreshToken;
 
@@ -27,6 +28,7 @@ const generateAccessAndRefreshToken = async (id) => {
         // return access and refresh token
         return { accessToken, refreshToken };
     } catch (error) {
+        // console.error('Error generating tokens:', error);
         throw new ApiError('Error creating access and refresh token', 500);
     }
 };
@@ -120,8 +122,8 @@ const loginUser = asyncHandler(async (req, res) => {
     // find user
     const user = await User.findOne({
         $or: [
-            { username: username.toLowerCase() },
-            { email: email.toLowerCase() },
+            { username: username?.toLowerCase() },
+            { email: email?.toLowerCase() },
         ],
     });
     if (!user) {
@@ -129,19 +131,21 @@ const loginUser = asyncHandler(async (req, res) => {
     }
 
     // authenticate password
-    const isValidPassword = await user.isValidPassword(password);
+    const isValidPassword = await user.isPasswordCorrect(password);
     if (!isValidPassword) {
         throw new ApiError('Invalid credentials', 401);
     }
 
     // generate acces and refresh tokens
-    const { accessToken, refreshToken } = generateAccessAndRefreshToken(
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
         user._id
     );
 
+    // console.log(accessToken,refreshToken)
+
     // update the user
-    const loggedInUser = await User.findByIdAndUpdate(
-        user._id.select('-password -refreshToken')
+    const loggedInUser = await User.findByIdAndUpdate(user._id).select(
+        '-password -refreshToken'
     );
 
     // generate cookies
@@ -153,8 +157,8 @@ const loginUser = asyncHandler(async (req, res) => {
     // send cookies
     return res
         .status(200)
-        .cookies('accessToken', accessToken, cookiesOptions)
-        .cookies('refreshToken', refreshToken, options)
+        .cookie('accessToken', accessToken, cookiesOptions)
+        .cookie('refreshToken', refreshToken, cookiesOptions)
         .json(
             new ApiResponse('User logged in Successfully', 200, {
                 user: loggedInUser,
@@ -165,35 +169,40 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-    // we don't have the access of the user so we will take a middleware that
-    // takes accessToken and finds the user and injects the user in req
-    
-    const user = await req.user;
-    await User.findByIdAndUpdate(
-        user._id,
-        {
-            $set: {
-                refreshToken: undefined,
+    try {
+        // we don't have the access of the user so we will take a middleware that
+        // takes accessToken and finds the user and injects the user in req
+
+        await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    refreshToken: undefined,
+                },
             },
-        },
-        // get the updated user
-        {
-            new: true,
-        }
-    );
+            // get the updated user
+            {
+                new: true,
+            }
+        );
 
-    const cookiesOptions = {
-        httpOnly: true,
-        secure: true,
-    };
+        const cookiesOptions = {
+            httpOnly: true,
+            secure: true,
+        };
 
-    // clear the cookies
+        // clear the cookies
 
-    return res
-        .status(200)
-        .clearCookie('accessToken', cookiesOptions)
-        .clearCookie('refreshToken', cookiesOptions)
-        .json(new ApiResponse('User logged out Successfully', 200));
+        return res
+            .status(200)
+            .clearCookie('accessToken', cookiesOptions)
+            .clearCookie('refreshToken', cookiesOptions)
+            .json(new ApiResponse('User logged out Successfully', 200));
+            
+    } catch (error) {
+        console.error('Error during logout:', error);
+        throw new ApiError('Logout failed', 500);
+    }
 });
 
 export { registerUser, loginUser, logoutUser };

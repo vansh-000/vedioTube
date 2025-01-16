@@ -19,7 +19,7 @@ router.route('/register').post(
 );
 
 // login router
-router.route('./login').post(loginUser);
+router.route('/login').post(loginUser);
 
 // PROTECTED ROUTES
 // validateJWT is a middleware that is injected in the route and the next allows it to execute the next logoutUser
