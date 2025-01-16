@@ -1,8 +1,7 @@
+// fn is the function that is being passed in this high order function
 const asyncHandler = (fn) => {
     return async (req, res, next) => {
-        Promise
-        .resolve(fn(req, res, next))
-        .catch((error) => next(error));
+        Promise.resolve(fn(req, res, next)).catch((error) => next(error));
     };
 };
 

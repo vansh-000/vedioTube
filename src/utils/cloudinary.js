@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { unlink } from 'node:fs';
+import { unlink, unlinkSync } from 'node:fs';
+import dotenv from 'dotenv';
+dotenv.config();
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -17,12 +19,16 @@ export const uploadOnCloudinary = async (localFilePath) => {
             resource_type: 'auto',
         });
         // file has been uploaded on the cloudinary
-        console.log('🟢 File has been uploaded on CLOUDINARY !!!');
-        console.log(uploadResult.url);
+        // console.log(' File has been uploaded on CLOUDINARY !!!');
+        // console.log(uploadResult.url);
+
+        unlinkSync(localFilePath);
+
         return uploadResult;
     } catch (error) {
-        console.error('🔴 Error while uploading file on CLOUDINARY !!!');
+        //  console.error('🔴 Error while uploading file on CLOUDINARY !!!');
         // removed the file from the local machine as upload failed
+
         unlink(localFilePath);
         return null;
     }
