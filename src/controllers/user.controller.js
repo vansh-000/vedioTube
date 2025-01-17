@@ -33,7 +33,6 @@ const generateAccessAndRefreshToken = async (id) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-
     // Get user data from request body
     const { username, fullname, email, password } = req.body;
 
@@ -111,7 +110,6 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-
     // get data from body
     const { username, email, password } = req.body;
 
@@ -208,7 +206,6 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 // generating a new access token if refereshToken exists
 const refreshAccessToken = asyncHandler(async (req, res) => {
-
     // store incomming referesh token
 
     const incommingRefreshToken =
@@ -273,7 +270,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const changePassword = asyncHandler(async (req, res) => {
-
     // take old password from req.body
     const { oldPassword, newPassword } = req.body;
 
@@ -302,16 +298,13 @@ const changePassword = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-
     // get user from req.user using middleware validate JWT
     return res
         .status(200)
         .json(new ApiResponse('User fetched successfully', 200, req.user));
-
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
-
     // get user fields from req.body
 
     const { username, fullname } = req.body;
@@ -393,7 +386,6 @@ const updateAvatar = asyncHandler(async (req, res) => {
 });
 
 const updateCoverImage = asyncHandler(async (req, res) => {
-
     // get files from req.files
     const coverImageLocalPath = req.file?.path;
 
@@ -419,6 +411,85 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         .json(new ApiResponse('Cover Image updated successfully', 200, user));
 });
 
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    // get username
+    const { username } = req.params;
+
+    // trim the username to remove empty spaces and check if it exists
+    if (!username?.trim()) {
+        throw new ApiError('Username is required', 400);
+    }
+
+    /* 
+    make an aggrigate pipeline to get no. of 
+    subscribers and no. of channels user subscribed
+    */
+    const userChannel = await User.aggregate([
+        {
+            $match: { username: username?.toLowerCase() },
+        },
+        {
+            // no. of subscribers
+            $lookup: {
+                from: 'subscriptions',
+                localField: '_id',
+                foreignField: 'channel',
+                as: 'subscribers',
+            },
+        },
+        {
+            // no. of channels user subscribed
+            $lookup: {
+                from: 'subscriptions',
+                localField: '_id',
+                foreignField: 'subscriber',
+                as: 'subscribedTo',
+            },
+        },
+        {
+            $addFields: {
+                // get the size of the array of subscribers and subscribedTo
+                subscriberCount: { $size: '$subscribers' },
+                channelsSubscribedToCount: { $size: '$subscribedTo' },
+                // set a flag if the user is subscribed to the channel for this
+                // we will check if the user id is in the array of subscribers Schema
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, '$subscribers.subscriber'] },
+                        then: true,
+                        else: false,
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                username: 1,
+                subscriberCount: 1,
+                channelsSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                fullname: 1,
+                email: 1,
+            },
+        },
+    ]);
+
+    // check if userChannel exists
+    if (!userChannel?.length) {
+        throw new ApiError('User not found', 404);
+    }
+
+    // send success response
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse('User fetched successfully', 200, userChannel[0])
+        );
+});
+
 export {
     registerUser,
     loginUser,
@@ -429,4 +500,5 @@ export {
     updateAvatar,
     updateUserDetails,
     updateCoverImage,
+    getUserChannelProfile,
 };
