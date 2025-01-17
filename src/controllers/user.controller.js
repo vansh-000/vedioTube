@@ -5,7 +5,6 @@ import { User, isPasswordCorrect } from '../models/user.model.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
 // ACCESS AND REFRESH TOKEN GENERATER
-
 const generateAccessAndRefreshToken = async (id) => {
     try {
         const user = await User.findById(id);
@@ -34,6 +33,7 @@ const generateAccessAndRefreshToken = async (id) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
+
     // Get user data from request body
     const { username, fullname, email, password } = req.body;
 
@@ -111,6 +111,7 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
+
     // get data from body
     const { username, email, password } = req.body;
 
@@ -207,6 +208,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 // generating a new access token if refereshToken exists
 const refreshAccessToken = asyncHandler(async (req, res) => {
+
     // store incomming referesh token
 
     const incommingRefreshToken =
@@ -271,6 +273,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const changePassword = asyncHandler(async (req, res) => {
+
     // take old password from req.body
     const { oldPassword, newPassword } = req.body;
 
@@ -299,13 +302,16 @@ const changePassword = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
+
     // get user from req.user using middleware validate JWT
     return res
         .status(200)
         .json(new ApiResponse('User fetched successfully', 200, req.user));
+
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
+
     // get user fields from req.body
 
     const { username, fullname } = req.body;
@@ -387,6 +393,7 @@ const updateAvatar = asyncHandler(async (req, res) => {
 });
 
 const updateCoverImage = asyncHandler(async (req, res) => {
+
     // get files from req.files
     const coverImageLocalPath = req.file?.path;
 
