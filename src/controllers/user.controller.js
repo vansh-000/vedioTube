@@ -1,7 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
-import { User } from '../models/user.model.js';
+import { User, isPasswordCorrect } from '../models/user.model.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
 // ACCESS AND REFRESH TOKEN GENERATER
@@ -205,8 +205,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     }
 });
 
-// generating a new access token if referestoken exists
-
+// generating a new access token if refereshToken exists
 const refreshAccessToken = asyncHandler(async (req, res) => {
     // store incomming referesh token
 
@@ -271,4 +270,46 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changePassword = asyncHandler(async (req, res) => {
+    // take old password from req.body
+    const { oldPassword, newPassword } = req.body;
+
+    // get user from req.user using middleware validate JWT
+    const user = await User.findById(req.user._id);
+
+    // check old password
+    const isOldPasswordCorrect = await isPasswordCorrect(oldPassword);
+    if (!isOldPasswordCorrect) {
+        throw new ApiError('Old password is incorrect', 400);
+    }
+
+    // change password
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    // return success response
+    return res.status(200).json(
+        new ApiResponse(
+            {
+                message: 'Password changed successfully',
+            },
+            200
+        )
+    );
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    // get user from req.user using middleware validate JWT
+    return res
+        .status(200)
+        .json(new ApiResponse('User fetched successfully', 200, req.user));
+});
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changePassword,
+    getCurrentUser,
+};
