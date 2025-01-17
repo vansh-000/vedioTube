@@ -335,13 +335,16 @@ const updateUserDetails = asyncHandler(async (req, res) => {
     }
 
     // get user from req.user using middleware validate JWT
-
     const user = await User.findByIdAndUpdate(
-        req.user._id,
-        { $set: changedFields },
+        req.user?._id,
+        {
+            $set: {
+                fullname,
+                email: email,
+            },
+        },
         { new: true }
-    );
-
+    ).select('-password');
     if (!user) {
         throw new ApiError('User not found', 404);
     }
@@ -350,7 +353,9 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse('User updated successfully', 200, user));
+        .json(
+            new ApiResponse(200, user, 'Account details updated successfully')
+        );
 });
 
 const updateAvatar = asyncHandler(async (req, res) => {
@@ -358,25 +363,27 @@ const updateAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path;
 
     if (!avatarLocalPath) {
-        throw new ApiError('Avatar is required', 400);
+        throw new ApiError(400, 'Avatar file is missing');
     }
+
+    //TODO: delete old image - assignment
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-    if (!avatar) {
-        throw new ApiError('Avatar upload failed', 500);
+    if (!avatar.url) {
+        throw new ApiError(400, 'Error while uploading on Cloudinary');
     }
 
     // get user from req.user using middleware validate JWT
     const user = await User.findByIdAndUpdate(
-        req.user._id,
+        req.user?._id,
         { $set: { avatar: avatar.url } },
         { new: true }
     ).select('-password');
     // send success response
     return res
         .status(200)
-        .json(new ApiResponse('Avatar updated successfully', 200, user));
+        .json(new ApiResponse(200, user, 'Avatar image updated successfully'));
 });
 
 const updateCoverImage = asyncHandler(async (req, res) => {
