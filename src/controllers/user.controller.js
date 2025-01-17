@@ -305,6 +305,106 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse('User fetched successfully', 200, req.user));
 });
 
+const updateUserDetails = asyncHandler(async (req, res) => {
+    // get user fields from req.body
+
+    const { username, fullname } = req.body;
+
+    // if no field is provided
+    if (!username && !fullname) {
+        throw new ApiError('No fields provided for updation !!!', 400);
+    }
+
+    // check if username or email already exists
+    const existingUser = await User.findOne({
+        $or: [{ username }, { fullname }],
+        _id: { $ne: req.user._id },
+    });
+
+    if (existingUser) {
+        throw new ApiError('Username or Email already exists', 400);
+    }
+
+    const changedFields = {};
+
+    if (username) {
+        changedFields['username'] = username;
+    }
+    if (fullname) {
+        changedFields['fullname'] = fullname;
+    }
+
+    // get user from req.user using middleware validate JWT
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: changedFields },
+        { new: true }
+    );
+
+    if (!user) {
+        throw new ApiError('User not found', 404);
+    }
+
+    // send success response
+
+    return res
+        .status(200)
+        .json(new ApiResponse('User updated successfully', 200, user));
+});
+
+const updateAvatar = asyncHandler(async (req, res) => {
+    // get files from req.files
+    const avatarLocalPath = req.file?.path;
+
+    if (!avatarLocalPath) {
+        throw new ApiError('Avatar is required', 400);
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!avatar) {
+        throw new ApiError('Avatar upload failed', 500);
+    }
+
+    // get user from req.user using middleware validate JWT
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: { avatar: avatar.url } },
+        { new: true }
+    ).select('-password');
+    // send success response
+    return res
+        .status(200)
+        .json(new ApiResponse('Avatar updated successfully', 200, user));
+});
+
+const updateCoverImage = asyncHandler(async (req, res) => {
+    // get files from req.files
+    const coverImageLocalPath = req.file?.path;
+
+    if (!coverImageLocalPath) {
+        throw new ApiError('Cover Image is required', 400);
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+    if (!coverImage) {
+        throw new ApiError('Cover Image upload failed', 500);
+    }
+
+    // get user from req.user using middleware validate JWT
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: { coverImage: coverImage.url } },
+        { new: true }
+    ).select('-password');
+    // send success response
+    return res
+        .status(200)
+        .json(new ApiResponse('Cover Image updated successfully', 200, user));
+});
+
 export {
     registerUser,
     loginUser,
@@ -312,4 +412,7 @@ export {
     refreshAccessToken,
     changePassword,
     getCurrentUser,
+    updateAvatar,
+    updateUserDetails,
+    updateCoverImage,
 };
