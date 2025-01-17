@@ -411,6 +411,8 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         .json(new ApiResponse('Cover Image updated successfully', 200, user));
 });
 
+// AGGREGATED PIPLENINE IS USED TO GET THE USER PROFILE
+
 const getUserChannelProfile = asyncHandler(async (req, res) => {
     // get username
     const { username } = req.params;
@@ -490,6 +492,71 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         );
 });
 
+// SUB AGGREGATE PIPELINE TO GET THE WATCH HISTORY OF THE USER
+// to get into videos from user and then populating the owner details from user Schema
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+    // get user from req.user using middleware validate JWT
+    const user = req.user;
+
+    // check for userValidity
+    if (!user) {
+        throw new ApiError('User not found', 404);
+    }
+
+    // aggregated pipeline to find user with the id
+    const fullUser = await User.aggregate([
+        {
+            $match: {
+                //  _id: user._id, THIS IS INCORRECT AS _id is an object id and user._id is a string
+                _id: mongoose.Types.ObjectId(user._id),
+            },
+        },
+        {
+            // now we will lookup the videos watched by the user
+            $lookup: {
+                from: 'videos',
+                localField: 'watchHistory',
+                foreignField: '_id',
+                as: 'watchHistory',
+                // we will populate the owner details form the video schema
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'owner',
+                            foreignField: '_id',
+                            as: 'owner',
+                            pipeline: [
+                                {
+                                    $project: {
+                                        username: 1,
+                                        fullname: 1,
+                                        avatar: 1,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        $addFields: {
+                            // overwriting user with the first element of the array for easy access by frontend
+                            owner: { $arrayElemAt: ['$owner', 0] },
+                        },
+                    },
+                ],
+            },
+        },
+    ]);
+
+    // return the response
+    return res.status(200).json(
+        new ApiResponse('Watch History fetched successfully', 200, {
+            watchHistory: fullUser[0]?.watchHistory,
+        })
+    );
+});
+
 export {
     registerUser,
     loginUser,
@@ -501,4 +568,5 @@ export {
     updateUserDetails,
     updateCoverImage,
     getUserChannelProfile,
+    getWatchHistory,
 };
