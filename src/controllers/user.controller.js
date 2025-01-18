@@ -1,8 +1,9 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
-import { User, isPasswordCorrect } from '../models/user.model.js';
+import { User } from '../models/user.model.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
+import mongoose from 'mongoose';
 
 // ACCESS AND REFRESH TOKEN GENERATER
 const generateAccessAndRefreshToken = async (id) => {
@@ -277,11 +278,19 @@ const changePassword = asyncHandler(async (req, res) => {
     // take old password from req.body
     const { oldPassword, newPassword } = req.body;
 
+    // check if old password and new password are provided
+    if (!oldPassword || !newPassword) {
+        throw new ApiError('Old and New Password are required', 400);
+    }
+
     // get user from req.user using middleware validate JWT
     const user = await User.findById(req.user._id);
+    if (!user) {
+        throw new ApiError('User not found', 404);
+    }
 
     // check old password
-    const isOldPasswordCorrect = await isPasswordCorrect(oldPassword);
+    const isOldPasswordCorrect = await user.isPasswordCorrect(oldPassword);
     if (!isOldPasswordCorrect) {
         throw new ApiError('Old password is incorrect', 400);
     }
@@ -309,55 +318,45 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
-    // get user fields from req.body
-
+    // get user from req.user using middleware validate JWT
     const { username, fullname } = req.body;
 
-    // if no field is provided
+    // Check if no field is provided
     if (!username && !fullname) {
-        throw new ApiError('No fields provided for updation !!!', 400);
+        throw new ApiError('No fields provided for update!', 400);
     }
 
-    // check if username or email already exists
+    // Check if username or fullname already exists
     const existingUser = await User.findOne({
         $or: [{ username }, { fullname }],
-        _id: { $ne: req.user._id },
+        _id: { $ne: req.user._id }, 
     });
 
     if (existingUser) {
-        throw new ApiError('Username or Email already exists', 400);
+        throw new ApiError('Username or Fullname already exists.', 400);
     }
 
+    // Prepare the fields to be updated
     const changedFields = {};
+    if (username) changedFields.username = username;
+    if (fullname) changedFields.fullname = fullname;
 
-    if (username) {
-        changedFields['username'] = username;
-    }
-    if (fullname) {
-        changedFields['fullname'] = fullname;
-    }
-
-    // get user from req.user using middleware validate JWT
+    // Update user details
     const user = await User.findByIdAndUpdate(
-        req.user?._id,
-        {
-            $set: {
-                fullname,
-                email: email,
-            },
-        },
-        { new: true }
-    ).select('-password');
+        req.user._id,
+        { $set: changedFields },
+        { new: true } 
+    ).select('-password'); 
+
     if (!user) {
-        throw new ApiError('User not found', 404);
+        throw new ApiError('User not found.', 404);
     }
 
-    // send success response
-
+    // Send success response
     return res
         .status(200)
         .json(
-            new ApiResponse(200, user, 'Account details updated successfully')
+            new ApiResponse('Account details updated successfully.', 200, user)
         );
 });
 
@@ -484,7 +483,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
     // check if userChannel exists
     if (!userChannel?.length) {
-        throw new ApiError('User not found', 404);
+        throw new ApiError('User not found !!', 404);
     }
 
     // send success response
@@ -513,7 +512,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         {
             $match: {
                 //  _id: user._id, THIS IS INCORRECT AS _id is an object id and user._id is a string
-                _id: mongoose.Types.ObjectId(user._id),
+                _id: new mongoose.Types.ObjectId(user._id),
             },
         },
         {

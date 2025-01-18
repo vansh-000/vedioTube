@@ -5,10 +5,12 @@ import {
     registerUser,
     refreshAccessToken,
     updateCoverImage,
-    updateUserAvatar,
-    updateUserAccount,
+    updateAvatar,
+    updateUserDetails,
     getCurrentUser,
     changePassword,
+    getUserChannelProfile,
+    getWatchHistory,
 } from '../controllers/user.controller.js';
 import { upload } from './../middlewares/multer.middleware.js';
 import { validateJWT } from '../middlewares/auth.middleware.js';
@@ -30,16 +32,19 @@ router.route('/login').post(loginUser);
 // PROTECTED ROUTES
 // validateJWT is a middleware that is injected in the route and the next allows it to execute the next logoutUser
 router.route('/logout').post(validateJWT, logoutUser);
-router.route('./refresh-token').post(refreshAccessToken);
-router.route('/change-password').post(verifyJWT, changePassword);
-router.route('/current-user').get(verifyJWT, getCurrentUser);
-router.route('/update-account').patch(verifyJWT, updateUserAccount);
+router.route('/refresh-token').post(refreshAccessToken);
+router.route('/change-password').post(validateJWT, changePassword);
+router.route('/current-user').get(validateJWT, getCurrentUser);
+router.route('/update-account').patch(validateJWT, updateUserDetails);
 
 router
     .route('/avatar')
-    .patch(verifyJWT, upload.single('avatar'), updateUserAvatar);
+    .patch(validateJWT, upload.single('avatar'), updateAvatar);
 router
     .route('/cover-image')
-    .patch(verifyJWT, upload.single('coverImage'), updateCoverImage);
+    .patch(validateJWT, upload.single('coverImage'), updateCoverImage);
+
+router.route('/c/:username').get(validateJWT,getUserChannelProfile);
+router.route('/history').patch(validateJWT,getWatchHistory);
 
 export default router;
