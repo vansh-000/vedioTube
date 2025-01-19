@@ -137,7 +137,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Invalid user id');
     }
 
-    // Aggregate liked videos with video and owner details
+    // Aggregate liked videos with video and owner details in a nested lookup
     const likedVideos = await Like.aggregate([
         {
             $match: {
@@ -151,22 +151,36 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                 localField: 'video',
                 foreignField: '_id',
                 as: 'videoDetails',
+                pipeline: [
+                    // Nested lookup to fetch the owner details inside the video document
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'owner',
+                            foreignField: '_id',
+                            as: 'owner',
+                            pipeline: [
+                                {
+                                    $project: {
+                                        username: 1,
+                                        fullname: 1,
+                                        avatar: 1,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        $addFields: {
+                            // Extract the owner from the array and simplify access
+                            owner: { $arrayElemAt: ['$owner', 0] },
+                        },
+                    },
+                ],
             },
         },
-        // nested lookup inside pipeline is not allowed so we need to unwind it
         {
             $unwind: '$videoDetails',
-        },
-        {
-            $lookup: {
-                from: 'users',
-                localField: 'videoDetails.owner',
-                foreignField: '_id',
-                as: 'videoOwner',
-            },
-        },
-        {
-            $unwind: '$videoOwner',
         },
         {
             $project: {
@@ -176,15 +190,14 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                 videoDescription: '$videoDetails.description',
                 createdAt: '$videoDetails.createdAt',
                 owner: {
-                    username: '$videoOwner.username',
-                    fullname: '$videoOwner.fullname',
-                    avatar: '$videoOwner.avatar',
+                    username: '$videoDetails.owner.username',
+                    fullname: '$videoDetails.owner.fullname',
+                    avatar: '$videoDetails.owner.avatar',
                 },
             },
         },
     ]);
 
-    // Return the liked videos
     return res.status(200).json(new ApiResponse(200, likedVideos));
 });
 

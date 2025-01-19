@@ -368,7 +368,7 @@ const updateAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Avatar file is missing');
     }
 
-    //TODO: delete old image - assignment
+    //TODO: delete old image from cloudinary
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
 
@@ -522,8 +522,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 localField: 'watchHistory',
                 foreignField: '_id',
                 as: 'watchHistory',
-                // we will populate the owner details form the video schema
-                pipeline: [
+                pipeline: [ // we will populate the owner details form the video schema
                     {
                         $lookup: {
                             from: 'users',
