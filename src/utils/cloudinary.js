@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { unlink, unlinkSync } from 'node:fs';
+import { unlinkSync } from 'fs';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -9,27 +9,39 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Upload image from the local server to cloudinary
-
 export const uploadOnCloudinary = async (localFilePath) => {
     try {
         if (!localFilePath) return null;
-        // upload file on cloudinary
-        const uploadResult = await cloudinary.uploader.upload(localFilePath, {
-            resource_type: 'auto',
-        });
-        // file has been uploaded on the cloudinary
-        // console.log(' File has been uploaded on CLOUDINARY !!!');
-        // console.log(uploadResult.url);
 
+        // Upload file to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(localFilePath, {
+            resource_type: 'auto', // Handles images, videos, etc.
+        });
+
+        // Remove the local file
         unlinkSync(localFilePath);
 
         return uploadResult;
     } catch (error) {
-        //  console.error('🔴 Error while uploading file on CLOUDINARY !!!');
-        // removed the file from the local machine as upload failed
+        // Remove the local file if upload fails
+        try {
+            unlinkSync(localFilePath);
+        } catch (err) {
+            console.error('Error while deleting local file:', err.message);
+        }
+        console.error('Error uploading file to Cloudinary:', error.message);
+        return null;
+    }
+};
 
-        unlink(localFilePath);
+export const deleteFromCloudinary = async (publicId) => {
+    try {
+        const result = await cloudinary.uploader.destroy(publicId, {
+            resource_type: 'auto', // Handles images, videos, etc.
+        });
+        return result;
+    } catch (error) {
+        console.error('Error deleting file from Cloudinary:', error.message);
         return null;
     }
 };

@@ -329,7 +329,7 @@ const updateUserDetails = asyncHandler(async (req, res) => {
     // Check if username or fullname already exists
     const existingUser = await User.findOne({
         $or: [{ username }, { fullname }],
-        _id: { $ne: req.user._id }, 
+        _id: { $ne: req.user._id },
     });
 
     if (existingUser) {
@@ -345,8 +345,8 @@ const updateUserDetails = asyncHandler(async (req, res) => {
     const user = await User.findByIdAndUpdate(
         req.user._id,
         { $set: changedFields },
-        { new: true } 
-    ).select('-password'); 
+        { new: true }
+    ).select('-password');
 
     if (!user) {
         throw new ApiError('User not found.', 404);
@@ -368,8 +368,13 @@ const updateAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Avatar file is missing');
     }
 
-    //TODO: delete old image from cloudinary
+    //delete old image from cloudinary
+    const user1 = await User.findById(req.user._id);
+    if (user1.avatar) {
+        await deleteFromCloudinary(user1.avatar);
+    }
 
+    // upload image to cloudinary
     const avatar = await uploadOnCloudinary(avatarLocalPath);
 
     if (!avatar.url) {
@@ -522,7 +527,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 localField: 'watchHistory',
                 foreignField: '_id',
                 as: 'watchHistory',
-                pipeline: [ // we will populate the owner details form the video schema
+                pipeline: [
+                    // we will populate the owner details form the video schema
                     {
                         $lookup: {
                             from: 'users',
